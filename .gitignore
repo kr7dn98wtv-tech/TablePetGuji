@@ -1,0 +1,26 @@
+# User state, generated tests and local logs
+**/data/
+**/work/
+**/bin/
+**/obj/
+.vs/
+.vscode/
+.idea/
+# Restored references and tools
+build-deps/
+.tools/
+# Build products and archives
+*.exe
+*.dll
+*.pdb
+*.zip
+*.nupkg
+dist/
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.user
+*.suo
+.DS_Store
+Thumbs.db
