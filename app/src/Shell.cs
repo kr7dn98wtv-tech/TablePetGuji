@@ -82,21 +82,31 @@ namespace GujiApp {
   static void SetStartup(bool enable){using(var k=Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){if(enable)k.SetValue("GujiDesktopPet","\""+System.IO.Path.Combine(Store.Root,"Guji.exe")+"\"");else k.DeleteValue("GujiDesktopPet",false);}}
   public void CloseSpeech(){if(speechTimer!=null)speechTimer.Stop();if(speech!=null){var old=speech;speech=null;old.Close();}}
   public Window SpeechWindow {get{return speech;}}
+  public static Size SpeechSize(string text,Rect area){
+   var words=new TextBlock{Text=text??"",FontSize=14,LineHeight=23,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,TextWrapping=TextWrapping.Wrap};
+   double limit=Math.Min(380,Math.Max(96,area.Width-16));
+   words.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));
+   double width=Math.Min(limit,Math.Max(120,Math.Ceiling(words.DesiredSize.Width)+64));
+   words.Measure(new Size(Math.Max(1,width-63),double.PositiveInfinity));
+   double height=Math.Max(56,Math.Ceiling(words.DesiredSize.Height)+32)+12;
+   return new Size(width,Math.Min(height,Math.Min(480,Math.Max(80,area.Height-16))));
+  }
   public void Speech(string text,double seconds){
    if(pet.Config.Focus||pet.View.Sleeping||!pet.IsVisible||(!pet.IsTest&&Native.Fullscreen()))return;CloseSpeech();
-   var words=new TextBlock{Text=text,FontSize=14,LineHeight=23,Foreground=ink,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(20,16,43,26)};
-   words.Measure(new Size(320,double.PositiveInfinity));double bodyHeight=Math.Max(65,words.DesiredSize.Height-10),height=bodyHeight+12;
+   Size size=SpeechSize(text,pet.WorkArea());double width=size.Width,height=size.Height,bodyHeight=height-12,right=width-1;
+   var words=new TextBlock{Name="SpeechText",Text=text??"",FontSize=14,LineHeight=23,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,Foreground=ink,TextWrapping=TextWrapping.Wrap};
+   var scroll=new ScrollViewer{Name="SpeechScroll",Content=words,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Margin=new Thickness(20,16,43,28),Focusable=false};
    var shape=new StreamGeometry();using(var g=shape.Open()){
-    g.BeginFigure(new Point(22,1),true,true);g.LineTo(new Point(298,1),true,false);g.QuadraticBezierTo(new Point(319,1),new Point(319,22),true,false);
-    g.LineTo(new Point(319,bodyHeight-21),true,false);g.QuadraticBezierTo(new Point(319,bodyHeight),new Point(298,bodyHeight),true,false);
+    g.BeginFigure(new Point(22,1),true,true);g.LineTo(new Point(right-21,1),true,false);g.QuadraticBezierTo(new Point(right,1),new Point(right,22),true,false);
+    g.LineTo(new Point(right,bodyHeight-21),true,false);g.QuadraticBezierTo(new Point(right,bodyHeight),new Point(right-21,bodyHeight),true,false);
     g.LineTo(new Point(66,bodyHeight),true,false);g.QuadraticBezierTo(new Point(53,bodyHeight+12),new Point(42,bodyHeight+11),true,false);g.QuadraticBezierTo(new Point(48,bodyHeight+6),new Point(47,bodyHeight),true,false);
     g.LineTo(new Point(22,bodyHeight),true,false);g.QuadraticBezierTo(new Point(1,bodyHeight),new Point(1,bodyHeight-21),true,false);
     g.LineTo(new Point(1,22),true,false);g.QuadraticBezierTo(new Point(1,1),new Point(22,1),true,false);
    }shape.Freeze();
-   var grid=new Grid{Width=320,Height=height};grid.Children.Add(new System.Windows.Shapes.Path{Data=shape,Fill=new SolidColorBrush(Color.FromArgb(220,215,242,222)),Stroke=new SolidColorBrush(Color.FromArgb(200,143,191,156)),StrokeThickness=1});grid.Children.Add(words);
+   var grid=new Grid{Width=width,Height=height};grid.Children.Add(new System.Windows.Shapes.Path{Data=shape,Fill=new SolidColorBrush(Color.FromArgb(220,215,242,222)),Stroke=new SolidColorBrush(Color.FromArgb(200,143,191,156)),StrokeThickness=1});grid.Children.Add(scroll);
    var close=Button("×",CloseSpeech);close.Padding=new Thickness(2);close.Margin=new Thickness(0,9,9,0);close.Width=24;close.Height=24;close.FontSize=13;close.Background=Brushes.Transparent;close.BorderThickness=new Thickness(0);close.HorizontalAlignment=HorizontalAlignment.Right;close.VerticalAlignment=VerticalAlignment.Top;close.ToolTip="收起这句话";close.Focusable=false;grid.Children.Add(close);
-   var w=new Window{Title=pet.Config.PetName+"的小气泡",Width=320,Height=height,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=null,ResizeMode=ResizeMode.NoResize,Topmost=pet.Config.Topmost,ShowInTaskbar=false,Owner=pet,ShowActivated=false,Focusable=false,Content=new Viewbox{Child=grid,Stretch=Stretch.Uniform}};
-   double scale=PanelScale(320,height,pet.WorkArea());w.Width=320*scale;w.Height=height*scale;speech=w;w.Closed+=(s,e)=>{if(speech==w){speech=null;if(speechTimer!=null)speechTimer.Stop();}};PositionBubble(w);w.Show();
+   var w=new Window{Title=pet.Config.PetName+"的小气泡",Width=width,Height=height,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=null,ResizeMode=ResizeMode.NoResize,Topmost=pet.Config.Topmost,ShowInTaskbar=false,Owner=pet,ShowActivated=false,Focusable=false,Content=grid};
+   speech=w;w.Closed+=(s,e)=>{if(speech==w){speech=null;if(speechTimer!=null)speechTimer.Stop();}};PositionBubble(w);w.Show();
    speechTimer=new DispatcherTimer{Interval=TimeSpan.FromSeconds(seconds)};speechTimer.Tick+=(s,e)=>CloseSpeech();speechTimer.Start();
   }
   void PositionBubble(Window w){var a=pet.WorkArea();w.Left=Math.Max(a.Left+4,Math.Min(a.Right-w.Width-4,pet.Left+pet.Width/2));w.Top=Math.Max(a.Top+4,Math.Min(a.Bottom-w.Height-4,pet.Top+80*pet.Config.Size-w.Height));}
